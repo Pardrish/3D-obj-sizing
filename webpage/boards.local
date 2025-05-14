@@ -1,0 +1,1 @@
+build.extra_flags=-DEI_CLASSIFIER_ALLOCATION_STATIC
