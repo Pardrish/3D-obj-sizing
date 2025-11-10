@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Safety Monitoring Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <style>
+    body {
+        background-color: #f5f5f5;
+        padding: 2rem;
+    }
+    .box {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        border-radius: 8px;
+    }
+    .notification {
+        display: none;
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 100;
+    }
+    img.snapshot {
+        max-width: 150px;
+        border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="notification" class="notification"></div>
+
+  <div class="container is-fluid">
+    <h1 class="title has-text-centered">Safety Monitoring Dashboard 👷</h1>
+    <hr>
+    <div class="columns">
+
+      <div class="column is-one-third">
+
+        <div class="box">
+          <h2 class="title is-4">📷 Add Camera</h2>
+          <form id="camera-form">
+            <div class="field">
+              <label class="label">Name</label>
+              <div class="control"><input class="input" type="text" id="camera-name" required></div>
+            </div>
+            <div class="field">
+              <label class="label">Username</label>
+              <div class="control"><input class="input" type="text" id="camera-username" required></div>
+            </div>
+            <div class="field">
+              <label class="label">Password</label>
+              <div class="control"><input class="input" type="password" id="camera-password" required></div>
+            </div>
+            <div class="field">
+              <label class="label">IP Address</label>
+              <div class="control"><input class="input" type="text" id="camera-ip" placeholder="e.g., 192.168.1.10" required></div>
+            </div>
+            <div class="control"><button class="button is-primary is-fullwidth" type="submit">Add Camera</button></div>
+          </form>
+        </div>
+
+        <div class="box">
+          <h2 class="title is-4">🛡️ Set PPE Rules</h2>
+          <form id="ppe-form">
+            <label class="checkbox mr-4"><input type="checkbox" id="ppe-helmet"> Helmet</label>
+            <label class="checkbox mr-4"><input type="checkbox" id="ppe-vest"> Vest</label>
+            <label class="checkbox mr-4"><input type="checkbox" id="ppe-gloves"> Gloves</label>
+            <label class="checkbox mr-4"><input type="checkbox" id="ppe-mask"> Mask</label>
+            <label class="checkbox"><input type="checkbox" id="ppe-glasses"> Glasses</label>
+            <div class="control mt-4"><button class="button is-info is-fullwidth" type="submit">Update Rules</button></div>
+          </form>
+        </div>
+
+        <div class="box">
+          <h2 class="title is-4">👤 Register Employee</h2>
+          <form id="employee-form">
+            <div class="field">
+              <label class="label">Employee ID</label>
+              <div class="control"><input class="input" type="text" id="employee-id" required></div>
+            </div>
+            <div class="field">
+              <label class="label">Employee Photo</label>
+              <div class="control"><input class="input" type="file" id="employee-file" accept="image/*" required></div>
+            </div>
+            <div class="control"><button class="button is-success is-fullwidth" type="submit">Register</button></div>
+          </form>
+        </div>
+      </div>
+
+      <div class="column">
+
+        <div class="box">
+          <div class="is-flex is-justify-content-space-between is-align-items-center">
+            <h2 class="title is-4">⚠️ PPE Violation Alerts</h2>
+            <button class="button is-light" id="refresh-ppe-alerts">Refresh</button>
+          </div>
+          <div id="ppe-alerts-container" class="mt-4"></div>
+        </div>
+
+        <div class="box">
+           <div class="is-flex is-justify-content-space-between is-align-items-center">
+            <h2 class="title is-4">🚫 Unauthorized Access Alerts</h2>
+            <button class="button is-light" id="refresh-unauthorized-alerts">Refresh</button>
+          </div>
+          <div id="unauthorized-alerts-container" class="mt-4"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const API_BASE_URL = 'http://127.0.0.1:8000/api';
+
+      // --- Notification Handler ---
+      const notificationEl = document.getElementById('notification');
+      function showNotification(message, type = 'is-success') {
+          notificationEl.textContent = message;
+          notificationEl.className = `notification ${type}`;
+          notificationEl.style.display = 'block';
+          setTimeout(() => { notificationEl.style.display = 'none'; }, 3000);
+      }
+
+      // --- Camera Form ---
+      document.getElementById('camera-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const config = {
+          name: document.getElementById('camera-name').value,
+          username: document.getElementById('camera-username').value,
+          password: document.getElementById('camera-password').value,
+          ip_address: document.getElementById('camera-ip').value,
+        };
+        try {
+          const response = await fetch(`${API_BASE_URL}/camera`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.detail || 'API Error');
+          showNotification(result.message || 'Camera added successfully!');
+          e.target.reset();
+        } catch (error) {
+          showNotification(error.message, 'is-danger');
+        }
+      });
+
+      // --- PPE Form ---
+      document.getElementById('ppe-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const config = {
+          helmet: document.getElementById('ppe-helmet').checked,
+          vest: document.getElementById('ppe-vest').checked,
+          gloves: document.getElementById('ppe-gloves').checked,
+          mask: document.getElementById('ppe-mask').checked,
+          glasses: document.getElementById('ppe-glasses').checked,
+        };
+        try {
+          const response = await fetch(`${API_BASE_URL}/setPPE`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.detail || 'API Error');
+          showNotification(result.message || 'PPE config updated!');
+        } catch (error) { showNotification(error.message, 'is-danger'); }
+      });
+
+      // --- Employee Form ---
+      document.getElementById('employee-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('employee_id', document.getElementById('employee-id').value);
+        formData.append('file', document.getElementById('employee-file').files[0]);
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/employees`, { method: 'POST', body: formData });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.detail || 'API Error');
+          showNotification(result.message || 'Employee registered.');
+          e.target.reset();
+        } catch (error) { showNotification(error.message, 'is-danger'); }
+      });
+      
+      // --- Alert Fetching Functions ---
+      async function fetchAlerts(endpoint, containerId, dataKey) {
+        const container = document.getElementById(containerId);
+        try {
+            const response = await fetch(`${API_BASE_URL}/${endpoint}`);
+            const data = await response.json();
+            const alerts = data[dataKey] || [];
+            container.innerHTML = '';
+
+            if (alerts.length === 0) {
+                container.innerHTML = '<p class="has-text-grey">No alerts found.</p>';
+                return;
+            }
+
+            const table = document.createElement('table');
+            table.className = 'table is-fullwidth is-striped is-hoverable';
+            
+            const isPpe = dataKey === 'ppe alerts';
+            table.innerHTML = `<thead><tr>
+                <th>Timestamp</th>
+                ${isPpe ? '<th>Employee ID</th><th>Violation</th>' : ''}
+                <th>Snapshot</th>
+            </tr></thead>`;
+
+            const tbody = document.createElement('tbody');
+            alerts.forEach(alert => {
+                const row = tbody.insertRow();
+                const timestamp = new Date(alert.timestamp).toLocaleString();
+                // IMPORTANT: Assumes snapshots are served from a /snapshots/ route.
+                const imagePath = `snapshots/${alert.snapshot_path.split('/').pop()}`;
+                
+                let cells = `<td>${timestamp}</td>`;
+                if (isPpe) {
+                    cells += `<td>${alert.employee_id}</td><td>${alert.violation}</td>`;
+                }
+                cells += `<td><img src="${API_BASE_URL}/${imagePath}" alt="Snapshot" class="snapshot"></td>`;
+                row.innerHTML = cells;
+            });
+            table.appendChild(tbody);
+            container.appendChild(table);
+
+        } catch (error) {
+            container.innerHTML = `<p class="has-text-danger">Error fetching alerts: ${error.message}</p>`;
+        }
+      }
+      
+      const fetchPpeAlerts = () => fetchAlerts('ppe_alerts', 'ppe-alerts-container', 'ppe alerts');
+      const fetchUnauthorizedAlerts = () => fetchAlerts('unauthorized_alerts', 'unauthorized-alerts-container', 'unauthorized access alerts');
+
+      // --- Initial Load & Refresh Buttons ---
+      document.getElementById('refresh-ppe-alerts').addEventListener('click', fetchPpeAlerts);
+      document.getElementById('refresh-unauthorized-alerts').addEventListener('click', fetchUnauthorizedAlerts);
+      
+      fetchPpeAlerts();
+      fetchUnauthorizedAlerts();
+    });
+  </script>
+</body>
+</html>
